@@ -1,0 +1,97 @@
+freshrss:
+  cron: "*/5 * * * *"
+  user:
+    uid: 1000
+    gid: 1000
+  timezone: Europe/London
+  image:
+    repository: ghcr.io/mystarinyoursky/freshrss
+    pullPolicy: Always
+    tag: {{ ENV.CONTAINER_VERSION }}
+  replicaCount: 1
+  storage:
+    data:
+      storageClassName: default
+      size: 20G
+    extensions:
+      storageClassName: default
+      size: 5G
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext:
+    fsGroup: 1000
+  imagePullSecrets: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+  setting:
+    database:
+      type: sqlite
+    admin:
+      user: admin
+      password: adminpass
+    language: en
+    title: FreshRSS
+    base_url: https://freshrss.org
+    allow_robots: false
+    allow_anonymous: false
+    allow_anonymous_refresh: false
+    api_enabled: false
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsUser: 1000
+    runAsGroup: 1000
+  tmpStorage: 256Mi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+webserver:
+  storage:
+    webserver:
+      storageClassName: default
+      size: 1G
+  image:
+    repository: nginxinc/nginx-unprivileged
+    pullPolicy: Always
+    tag: "latest"
+  securityContext:
+    capabilities:
+      drop:
+      - ALL
+    runAsUser: 101
+    runAsGroup: 101
+    readOnlyRootFilesystem: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext:
+    fsGroup: 1000
+  tmpStorage: 128Mi
+  imagePullSecrets: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+

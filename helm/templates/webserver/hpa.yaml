@@ -1,0 +1,29 @@
+---
+{{- if .Values.freshrss.autoscaling.enabled }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "freshrss.name-webserver" . }}
+  labels:
+    {{- include "freshrss.labels-webserver" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "freshrss.name-webserver" . }}
+  minReplicas: {{ .Values.freshrss.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.freshrss.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.freshrss.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ .Values.freshrss.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.freshrss.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ .Values.freshrss.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}

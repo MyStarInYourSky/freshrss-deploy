@@ -1,0 +1,127 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "freshrss.name-app" . }}-init
+  annotations:
+    argocd.argoproj.io/hook: Sync
+  labels:
+    {{- include "freshrss.labels-app" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}-init
+          securityContext:
+            {{- toYaml .Values.freshrss.securityContext | nindent 13 }}
+          image: "{{ .Values.freshrss.image.repository }}:{{ .Values.freshrss.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.freshrss.image.pullPolicy }}
+          command: ['/bin/sh', '/usr/local/bin/freshrss-admin-user-creation.sh']
+          env:
+          {{- if eq .Values.freshrss.setting.database.type "postgres" }}
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbHost
+                  optional: false
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbUser
+                  optional: false
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbPassword
+                  optional: false
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbName
+                  optional: false
+          {{ else if eq .Values.freshrss.setting.database.type "mysql" }}
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbHost
+                  optional: false
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbUser
+                  optional: false
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbPassword
+                  optional: false
+            - name: MYSQL_DB
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: dbName
+                  optional: false
+          {{ end }}
+            - name: FRESHRSS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: userName
+                  optional: false
+            - name: FRESHRSS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "freshrss.name-app" . }}"
+                  key: userPassword
+                  optional: false
+          resources:
+            {{- toYaml .Values.freshrss.resources | nindent 12 }}
+          volumeMounts:
+            - name: {{ include "freshrss.name-app" . }}-data
+              mountPath: /app/data
+            - name: {{ include "freshrss.name-app" . }}-extensions
+              mountPath: /app/extensions
+            - name: {{ include "freshrss.name-app" . }}-usercreation
+              mountPath: /usr/local/bin/freshrss-admin-user-creation.sh
+              subPath: freshrss-admin-user-creation.sh
+              readOnly: true
+            - name: {{ include "freshrss.name-app" . }}-timezone
+              mountPath: /usr/local/etc/php/conf.d/timezone.ini
+              subPath: timezone.ini
+              readOnly: true
+            - name: {{ include "freshrss.name-app" . }}-tmp
+              mountPath: /tmp
+      volumes:
+      - name: {{ include "freshrss.name-app" . }}-data
+        persistentVolumeClaim:
+          claimName: {{ include "freshrss.name-app" . }}-data
+      - name: {{ include "freshrss.name-app" . }}-extensions
+        persistentVolumeClaim:
+          claimName: {{ include "freshrss.name-app" . }}-extensions
+      - name: {{ include "freshrss.name-app" . }}-usercreation
+        configMap:
+          name: {{ include "freshrss.name-app" . }}-usercreation
+          defaultMode: 0755
+          items:
+            - key: freshrss-admin-user-creation.sh
+              path: freshrss-admin-user-creation.sh
+      - name: {{ include "freshrss.name-app" . }}-timezone
+        configMap:
+          name: {{ include "freshrss.name-app" . }}-timezone
+          defaultMode: 0644
+          items:
+            - key: timezone.ini
+              path: timezone.ini
+      - name: {{ include "freshrss.name-app" . }}-tmp
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.freshrss.tmpStorage }}
+      restartPolicy: Never
+  backoffLimit: 4

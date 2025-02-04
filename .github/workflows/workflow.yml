@@ -1,0 +1,309 @@
+name: Build Workflow
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - container/**
+      - helm/**
+      - .github/workflows/**
+      - buildscripts/**
+  pull_request:
+    branches: [ master ]
+    paths:
+      - container/**
+      - helm/**
+      - .github/workflows/**
+  schedule:
+    - cron:  '0 */6 * * *'
+permissions:
+  actions: read
+  attestations: none
+  checks: read
+  contents: read
+  deployments: none
+  id-token: none
+  issues: read
+  discussions: read
+  packages: write
+  pages: none
+  pull-requests: read
+  repository-projects: none
+  security-events: none
+  statuses: none
+defaults:
+  run:
+    shell: bash
+env:
+  CONTAINER_BUILD_BASEIMAGE: php:8.4-fpm-alpine
+  HELM_RELEASE: 3.17.0
+  RCLONE_RELEASE: 1.69.0
+jobs:
+  builddecision:
+    name: Build Decision
+    runs-on: ubuntu-24.04
+    env:
+      FORCE_COLOR: 1
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EVENT_NAME: ${{ github.event_name }}
+    outputs:
+      BUILD_REQUIRED: ${{ steps.builddecision.outputs.BUILD_REQUIRED }}
+      RELEASE_REQUIRED: ${{ steps.builddecision.outputs.RELEASE_REQUIRED }}
+      CONTAINER_VERSION: ${{ steps.builddecision.outputs.CONTAINER_VERSION }}
+      APP_VERSION: ${{ steps.builddecision.outputs.APP_VERSION }}
+      PHP_API_VERSION: ${{ steps.builddecision.outputs.PHP_API_VERSION }}
+    defaults:
+      run:
+        working-directory: ./buildscripts
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.13.1
+        cache: 'pip'
+        cache-dependency-path: 'buildscripts/requirements.txt'
+    - name: Fix Permissions
+      run: |
+        chmod +x *.sh
+        chmod +x *.py
+    - name: Install Requirements
+      run: pip3 install -r requirements.txt
+    - name: Get build decisions
+      id: builddecision
+      run: ./build_decision.sh
+  helm-lint:
+    name: Helm Linting and Verification
+    runs-on: ubuntu-24.04
+    needs: builddecision
+    env:
+      FORCE_COLOR: 1
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CONTAINER_VERSION: ${{needs.builddecision.outputs.CONTAINER_VERSION}}
+    defaults:
+      run:
+        working-directory: ./helm
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    - name: Install Helm
+      working-directory: /tmp
+      run: |
+        wget https://get.helm.sh/helm-v${HELM_RELEASE}-linux-amd64.tar.gz
+        tar xvf helm-v${HELM_RELEASE}-linux-amd64.tar.gz
+        sudo mv /tmp/linux-amd64/helm /usr/local/bin/helm
+        rm -rf /tmp/linux-amd64
+    - name: Install minijinja-cli
+      working-directory: /tmp
+      run: |
+        wget https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-gnu.tar.xz
+        tar xvf minijinja-cli-x86_64-unknown-linux-gnu.tar.xz
+        sudo mv /tmp/minijinja-cli-x86_64-unknown-linux-gnu/minijinja-cli /usr/local/bin/minijinja-cli
+        rm -rf /tmp/minijinja-cli-x86_64-unknown-linux-gnu
+    - name: Helm Check Release
+      run: |
+        export IMAGE_VERSION=$(curl -s -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/orgs/MyStarInYourSky/packages/container/freshrss/versions | jq -r '.[].metadata.container.tags.[]| select(. != "latest")' | sort -V  | tail -1)
+        minijinja-cli --env Chart.yaml.j2 > Chart.yaml
+        minijinja-cli --env values.yaml.j2 > values.yaml
+        helm lint .
+    - name: Upload rendered Chart.yaml
+      uses: actions/upload-artifact@v4
+      if: needs.builddecision.outputs.BUILD_REQUIRED == 'True'
+      with:
+        name: Chart.yaml
+        path: helm/Chart.yaml
+    - name: Upload rendered values.yaml
+      uses: actions/upload-artifact@v4
+      if: needs.builddecision.outputs.BUILD_REQUIRED == 'True'
+      with:
+        name: values.yaml
+        path: helm/values.yaml
+  helm-build:
+    name: Helm Package Build
+    runs-on: ubuntu-24.04
+    needs: [ builddecision, helm-lint ]
+    if: needs.builddecision.outputs.BUILD_REQUIRED == 'True'
+    env:
+      FORCE_COLOR: 1
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CONTAINER_VERSION: ${{needs.builddecision.outputs.CONTAINER_VERSION}}
+    defaults:
+      run:
+        working-directory: ./helm
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    - name: Install Helm
+      working-directory: /tmp
+      run: |
+        wget https://get.helm.sh/helm-v${HELM_RELEASE}-linux-amd64.tar.gz
+        tar xvf helm-v${HELM_RELEASE}-linux-amd64.tar.gz
+        sudo mv /tmp/linux-amd64/helm /usr/local/bin/helm
+        rm -rf /tmp/linux-amd64
+    - name: Fix Permissions
+      run: |
+        chmod +x ../buildscripts/*.sh
+        chmod +x ../buildscripts/*.py
+    - uses: actions/download-artifact@v4
+      with:
+        name: Chart.yaml
+        path: helm
+    - uses: actions/download-artifact@v4
+      with:
+        name: values.yaml
+        path: helm
+    - name: Run Package
+      run: helm package .
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      if: needs.builddecision.outputs.RELEASE_REQUIRED == 'True'
+      with:
+        name: freshrss_helm
+        path: helm/freshrss-${{ env.CONTAINER_VERSION }}.tgz
+        retention-days: 1
+  container-build:
+    name: Container Build
+    runs-on: ubuntu-24.04
+    needs: builddecision
+    if: needs.builddecision.outputs.BUILD_REQUIRED == 'True'
+    env:
+      BUILD_REQUIRED: ${{needs.builddecision.outputs.BUILD_REQUIRED}}
+      RELEASE_REQUIRED: ${{needs.builddecision.outputs.RELEASE_REQUIRED}}
+      CONTAINER_VERSION: ${{needs.builddecision.outputs.CONTAINER_VERSION}}
+      PHP_API_VERSION: ${{needs.builddecision.outputs.PHP_API_VERSION}}
+      APP_VERSION: ${{needs.builddecision.outputs.APP_VERSION}}
+    strategy:
+      matrix:
+        TARGET_ARCH: ["armv7_linux/arm/v7", "armv6_linux/arm/v6", "amd64_linux/amd64", "arm64_linux/arm64/v8", "386_linux/386"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.13.1
+          cache: 'pip'
+          cache-dependency-path: 'buildscripts/requirements.txt'
+      - name: Fix Permissions
+        run: |
+          chmod +x buildscripts/*.sh
+          chmod +x buildscripts/*.py
+      - name: Install Prerequisites
+        run: |
+          sudo apt update
+          sudo apt install -y qemu-user-static
+      - name: Install Requirements
+        run: pip3 install -r buildscripts/requirements.txt
+      - name: Run container build
+        run: |
+          export TARGET_NAME=$(echo "${{ matrix.TARGET_ARCH }}" | awk -F '_' '{print $1}')
+          export TARGET_PLATFORM=$(echo "${{ matrix.TARGET_ARCH }}" | awk -F '_' '{print $2}')
+          echo "TARGET_NAME=$TARGET_NAME" >> $GITHUB_ENV
+          echo "TARGET_PLATFORM=$TARGET_PLATFORM" >> $GITHUB_ENV
+          cd container
+          buildah bud --tag "ghcr.io/mystarinyoursky/freshrss:${CONTAINER_VERSION}-${TARGET_NAME}" --platform=$TARGET_PLATFORM --build-arg TARGET_PLATFORM=$TARGET_PLATFORM --build-arg CONTAINER_BUILD_BASEIMAGE=$CONTAINER_BUILD_BASEIMAGE --build-arg PHP_API_VERSION=$PHP_API_VERSION --build-arg APP_VER=$APP_VERSION
+          buildah push "ghcr.io/mystarinyoursky/freshrss:${CONTAINER_VERSION}-${TARGET_NAME}" oci-archive:/$(pwd)/freshrss_${TARGET_NAME}:ghcr.io/mystarinyoursky/freshrss:${CONTAINER_VERSION}-${TARGET_NAME}
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        if: needs.builddecision.outputs.RELEASE_REQUIRED == 'True'
+        with:
+          name: freshrss_${{ env.TARGET_NAME }}
+          path: container/freshrss_${{ env.TARGET_NAME }}
+          retention-days: 1
+  helm-release:
+    name: Helm Repo Release
+    runs-on: ubuntu-24.04
+    needs: [ builddecision, helm-build, container-mergeimage ]
+    if: needs.builddecision.outputs.RELEASE_REQUIRED == 'True'
+    env:
+      FORCE_COLOR: 1
+      RCLONE_CONFIG_MYS3_PROVIDER: IDrive
+      RCLONE_CONFIG_MYS3_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_MYS3_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_MYS3_ENDPOINT: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
+      RCLONE_CONFIG_MYS3_TYPE: s3
+      RCLONE_CONFIG_MYS3_NO_CHECK_BUCKET: True
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CONTAINER_VERSION: ${{needs.builddecision.outputs.CONTAINER_VERSION}}
+    defaults:
+      run:
+        working-directory: ./helm
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    - name: Fix Permissions
+      run: |
+        chmod +x ../buildscripts/*.sh
+        chmod +x ../buildscripts/*.py
+    - name: Generate build dir
+      run: mkdir build
+    - uses: actions/download-artifact@v4
+      with:
+        name: freshrss_helm
+        path: helm/build
+    - name: Get Rclone
+      run: |
+        cd /tmp
+        wget https://downloads.rclone.org/v${RCLONE_RELEASE}/rclone-v${RCLONE_RELEASE}-linux-amd64.zip
+        unzip rclone-v${RCLONE_RELEASE}-linux-amd64.zip
+        sudo cp rclone-v${RCLONE_RELEASE}-linux-amd64/rclone /usr/local/bin/rclone
+        rm -r rclone-v${RCLONE_RELEASE}-linux-amd64/
+    - name: Run Index
+      run: |
+        cd build
+        export REPO_BOOTSTRAPPED="False"
+        aws s3api head-object --endpoint-url ${AWS_ENDPOINT_URL_S3} --bucket mystarinyoursky-helm-freshrss --key index.yaml > /dev/null 2>&1 || export REPO_BOOTSTRAPPED="True"
+        if [ $REPO_BOOTSTRAPPED == "False" ]; then
+          rclone copy mys3:mystarinyoursky-helm-freshrss/index.yaml index.yaml
+          helm repo index . --url https://freshrss.helm.mystarinyoursky.net --merge index.yaml
+        elif [ $REPO_BOOTSTRAPPED == "True" ]; then
+          helm repo index . --url https://freshrss.helm.mystarinyoursky.net
+        fi
+        rclone copy index.yaml mys3:mystarinyoursky-helm-freshrss
+        rclone copy freshrss-${CONTAINER_VERSION}.tgz mys3:mystarinyoursky-helm-freshrss
+  container-mergeimage:
+    name: Container Image Architecture Merge
+    runs-on: ubuntu-24.04
+    needs: [container-build, builddecision]
+    if: needs.builddecision.outputs.RELEASE_REQUIRED == 'True'
+    env:
+      RELEASE_REQUIRED: ${{needs.builddecision.outputs.RELEASE_REQUIRED}}
+      BUILD_REQUIRED: ${{needs.builddecision.outputs.BUILD_REQUIRED}}
+      CONTAINER_VERSION: ${{needs.builddecision.outputs.CONTAINER_VERSION}}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Fix Permissions
+        run: |
+          chmod +x buildscripts/*.sh
+          chmod +x buildscripts/*.py
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: freshrss_armv7
+      - uses: actions/download-artifact@v4
+        with:
+          name: freshrss_armv6
+      - uses: actions/download-artifact@v4
+        with:
+          name: freshrss_amd64
+      - uses: actions/download-artifact@v4
+        with:
+          name: freshrss_arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: freshrss_386
+      - name: Merge containers
+        run: buildscripts/container_merge.sh

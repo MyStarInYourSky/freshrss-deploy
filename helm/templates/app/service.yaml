@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "freshrss.name-app" . }}
+  labels:
+    {{- include "freshrss.labels-app" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: php-fpm
+  selector:
+    {{- include "freshrss.selectorLabels-app" . | nindent 4 }}

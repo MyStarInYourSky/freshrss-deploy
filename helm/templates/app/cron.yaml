@@ -1,0 +1,52 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "freshrss.name-app" . }}-cron
+  labels:
+    {{- include "freshrss.labels-app" . | nindent 4 }}
+spec:
+  schedule: "{{ .Values.freshrss.cron }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: {{ .Chart.Name }}-cron
+              securityContext: {{ toYaml .Values.freshrss.securityContext | nindent 15 }}
+              image: "{{ .Values.freshrss.image.repository }}:{{ .Values.freshrss.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.freshrss.image.pullPolicy }}
+              command: ['/bin/sh', '-c', 'php -f /app/app/actualize_script.php']
+              volumeMounts:
+                - name: {{ include "freshrss.name-app" . }}-data
+                  mountPath: /app/data
+                - name: {{ include "freshrss.name-app" . }}-extensions
+                  mountPath: /app/extensions
+                - name: {{ include "freshrss.name-app" . }}-timezone
+                  mountPath: /usr/local/etc/php/conf.d/timezone.ini
+                  subPath: timezone.ini
+                  readOnly: true
+                - name: {{ include "freshrss.name-app" . }}-tmp
+                  mountPath: /tmp
+          volumes:
+            - name: {{ include "freshrss.name-app" . }}-data
+              persistentVolumeClaim:
+                claimName: {{ include "freshrss.name-app" . }}-data
+            - name: {{ include "freshrss.name-app" . }}-extensions
+              persistentVolumeClaim:
+                claimName: {{ include "freshrss.name-app" . }}-extensions
+            - name: {{ include "freshrss.name-app" . }}-timezone
+              configMap:
+                name: {{ include "freshrss.name-app" . }}-timezone
+                defaultMode: 0644
+                items:
+                  - key: timezone.ini
+                    path: timezone.ini
+            - name: {{ include "freshrss.name-app" . }}-tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: {{ .Values.freshrss.tmpStorage }}
+          restartPolicy: OnFailure

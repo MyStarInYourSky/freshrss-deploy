@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "freshrss.name-webserver" . }}-data
+  labels:
+    {{- include "freshrss.labels-webserver" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.webserver.storage.webserver.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.webserver.storage.webserver.size }}

@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "freshrss.name-app" . }}-usercreation
+  labels:
+    {{- include "freshrss.labels-app" . | nindent 4 }}
+data:
+  freshrss-admin-user-creation.sh: |
+    cd /app
+    if [ ! -f "/app/data/config.php" ]; then
+      ./cli/prepare.php
+      {{- if eq .Values.freshrss.setting.database.type "sqlite" }}
+      ./cli/do-install.php \
+        --default_user "$FRESHRSS_USERNAME" \
+        --auth_type form \
+        --environment production \
+        --language {{ .Values.freshrss.setting.language }} \
+        --title {{ .Values.freshrss.setting.title }} \
+        --base_url {{ .Values.freshrss.setting.base_url }} \
+        --db-type sqlite \
+        --disable_update{{ if .Values.freshrss.setting.allow_robots }} --allow_robots{{ end }}{{ if .Values.freshrss.setting.allow_anonymous }} --allow_anonymous{{ end }}{{- if .Values.freshrss.setting.allow_anonymous_refresh }} --allow_anonymous_refresh{{ end }}{{ if .Values.freshrss.setting.api_enabled }} --api_enabled{{ end }}
+      {{ else if eq .Values.freshrss.setting.database.type "postgres" }}
+      ./cli/do-install.php \
+        --default_user "$FRESHRSS_USERNAME" \
+        --auth_type form \
+        --environment production \
+        --language {{ .Values.freshrss.setting.language }} \
+        --title {{ .Values.freshrss.setting.title }} \
+        --base_url {{ .Values.freshrss.setting.base_url }} \
+        --db-type pgsql \
+        --db-host $POSTGRES_HOST \
+        --db-user $POSTGRES_USER \
+        --db-password $POSTGRES_PASSWORD \
+        --db-base $POSTGRES_DB \
+        --db-prefix {{ .Values.freshrss.setting.database.dbprefix | default "app_" }} \
+        --disable_update{{ if .Values.freshrss.setting.allow_robots }} --allow_robots{{ end }}{{ if .Values.freshrss.setting.allow_anonymous }} --allow_anonymous{{ end }}{{- if .Values.freshrss.setting.allow_anonymous_refresh }} --allow_anonymous_refresh{{ end }}{{ if .Values.freshrss.setting.api_enabled }} --api_enabled{{ end }}
+      {{ else if eq .Values.freshrss.setting.database.type "mysql" }}
+      ./cli/do-install.php \
+        --default_user "$FRESHRSS_USERNAME" \
+        --auth_type form \
+        --environment production \
+        --language {{ .Values.freshrss.setting.language }} \
+        --title {{ .Values.freshrss.setting.title }} \
+        --base_url {{ .Values.freshrss.setting.base_url }} \
+        --db-type mysql \
+        --db-host $MYSQL_HOST \
+        --db-user $MYSQL_USER \
+        --db-password $MYSQL_PASSWORD \
+        --db-base $MYSQL_DB \
+        --db-prefix {{ .Values.freshrss.setting.database.dbprefix | default "app_" }} \
+        --disable_update{{ if .Values.freshrss.setting.allow_robots }} --allow_robots{{ end }}{{ if .Values.freshrss.setting.allow_anonymous }} --allow_anonymous{{ end }}{{- if .Values.freshrss.setting.allow_anonymous_refresh }} --allow_anonymous_refresh{{ end }}{{ if .Values.freshrss.setting.api_enabled }} --api_enabled{{ end }}
+      {{- end -}}
+      ./cli/create-user.php --user "$FRESHRSS_USERNAME" --password "$FRESHRSS_PASSWORD"
+    else
+      ./cli/reconfigure.php
+    fi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "freshrss.name-app" . }}-timezone
+  labels:
+    {{- include "freshrss.labels-app" . | nindent 4 }}
+data:
+  timezone.ini: |
+    [PHP]
+    date.timezone = "{{ .Values.freshrss.timezone }}"

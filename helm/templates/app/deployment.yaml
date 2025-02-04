@@ -1,0 +1,93 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "freshrss.name-app" . }}
+  labels:
+    {{- include "freshrss.labels-app" . | nindent 4 }}
+spec:
+  {{- if not .Values.freshrss.autoscaling.enabled }}
+  replicas: {{ .Values.freshrss.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "freshrss.selectorLabels-app" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.freshrss.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "freshrss.selectorLabels-app" . | nindent 8 }}
+    spec:
+      {{- with .Values.freshrss.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "freshrss.name-app" . }}
+      securityContext:
+        {{- toYaml .Values.freshrss.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.freshrss.securityContext | nindent 12 }}
+          image: "{{ .Values.freshrss.image.repository }}:{{ .Values.freshrss.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.freshrss.image.pullPolicy }}
+          ports:
+            - name: php-fpm
+              containerPort: 9000
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.freshrss.resources | nindent 12 }}
+          volumeMounts:
+            - name: {{ include "freshrss.name-app" . }}-data
+              mountPath: /app/data
+            - name: {{ include "freshrss.name-app" . }}-extensions
+              mountPath: /app/extensions
+            - name: {{ include "freshrss.name-app" . }}-timezone
+              mountPath: /usr/local/etc/php/conf.d/timezone.ini
+              subPath: timezone.ini
+              readOnly: true
+            - name: {{ include "freshrss.name-app" . }}-tmp
+              mountPath: /tmp
+      volumes:
+      - name: {{ include "freshrss.name-app" . }}-data
+        persistentVolumeClaim:
+          claimName: {{ include "freshrss.name-app" . }}-data
+      - name: {{ include "freshrss.name-app" . }}-extensions
+        persistentVolumeClaim:
+          claimName: {{ include "freshrss.name-app" . }}-extensions
+      - name: {{ include "freshrss.name-app" . }}-timezone
+        configMap:
+          name: {{ include "freshrss.name-app" . }}-timezone
+          defaultMode: 0644
+          items:
+            - key: timezone.ini
+              path: timezone.ini
+      - name: {{ include "freshrss.name-app" . }}-tmp
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.freshrss.tmpStorage }}
+      {{- with .Values.freshrss.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.freshrss.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.freshrss.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
