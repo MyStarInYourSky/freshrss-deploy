@@ -6,6 +6,7 @@ LABEL org.opencontainers.image.description="FreshRSS"
 LABEL org.opencontainers.image.licenses=MIT
 RUN apk add --no-cache bash
 SHELL ["/bin/bash", "-c"]
+RUN echo "$TARGET_PLATFORM"
 RUN apk add --no-cache gmp gmp-dev icu icu-dev libzip-dev libzip libpq-dev \
     && if [[ "$TARGET_PLATFORM" == "linux/arm64/v8" ]]; then \
             docker-php-ext-configure gmp --build x86_64-pc-linux-musl --host aarch64-linux-musl; \
