@@ -71,3 +71,4 @@ helm install freshrss mystarinyoursky-freshrss/freshrss -f values.yaml
 | webserver.tmpStorage | `256Mi` | Amount of in-memory /tmp storage for NGINX |
 | webserver.imagePullSecrets | `[]` | Image pull secrets |
 | webserver.resources | `{limits: {cpu: 100m, memory: 128Mi}, requests: {cpu: 100m, memory: 128Mi}}` | Resource limits and requests of the NGINX pod |
+
