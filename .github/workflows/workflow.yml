@@ -259,14 +259,14 @@ jobs:
         cd build
         export REPO_BOOTSTRAPPED="False"
         aws s3api head-object --endpoint-url ${AWS_ENDPOINT_URL_S3} --bucket mystarinyoursky-helm-freshrss --key index.yaml > /dev/null 2>&1 || export REPO_BOOTSTRAPPED="True"
-        if [ $REPO_BOOTSTRAPPED == "False" ]; then
-          rclone copy mys3:mystarinyoursky-helm-freshrss/index.yaml index.yaml
+        if [ $REPO_BOOTSTRAPPED == "True" ]; then
+          rclone copyto mys3:mystarinyoursky-helm-freshrss/index.yaml index.yaml
           helm repo index . --url https://freshrss.helm.mystarinyoursky.net --merge index.yaml
-        elif [ $REPO_BOOTSTRAPPED == "True" ]; then
+        elif [ $REPO_BOOTSTRAPPED == "False" ]; then
           helm repo index . --url https://freshrss.helm.mystarinyoursky.net
         fi
-        rclone copy index.yaml mys3:mystarinyoursky-helm-freshrss
-        rclone copy freshrss-${CONTAINER_VERSION}.tgz mys3:mystarinyoursky-helm-freshrss
+        rclone copyto index.yaml mys3:mystarinyoursky-helm-freshrss
+        rclone copyto freshrss-${CONTAINER_VERSION}.tgz mys3:mystarinyoursky-helm-freshrss
   container-mergeimage:
     name: Container Image Architecture Merge
     runs-on: ubuntu-24.04
