@@ -1,12 +1,12 @@
 ARG CONTAINER_BUILD_BASEIMAGE
 ARG TARGET_PLATFORM
 FROM --platform=$TARGET_PLATFORM $CONTAINER_BUILD_BASEIMAGE as build-extensions
-LABEL org.opencontainers.image.source=https://github.com/MyStarInYourSky/freshrss-kubernetes
+LABEL org.opencontainers.image.source=https://github.com/MyStarInYourSky/freshrss-deploy
 LABEL org.opencontainers.image.description="FreshRSS"
 LABEL org.opencontainers.image.licenses=MIT
+ARG TARGET_PLATFORM
 RUN apk add --no-cache bash
 SHELL ["/bin/bash", "-c"]
-RUN echo "$TARGET_PLATFORM"
 RUN apk add --no-cache gmp gmp-dev icu icu-dev libzip-dev libzip libpq-dev \
     && if [[ "$TARGET_PLATFORM" == "linux/arm64/v8" ]]; then \
             docker-php-ext-configure gmp --build x86_64-pc-linux-musl --host aarch64-linux-musl; \
@@ -57,7 +57,7 @@ RUN apk add --no-cache gmp gmp-dev icu icu-dev libzip-dev libzip libpq-dev \
     && apk add --no-cache gmp icu libzip libpq
 
 FROM --platform=$TARGET_PLATFORM $CONTAINER_BUILD_BASEIMAGE as build-pecl
-LABEL org.opencontainers.image.source=https://github.com/MyStarInYourSky/freshrss-kubernetes
+LABEL org.opencontainers.image.source=https://github.com/MyStarInYourSky/freshrss-deploy
 LABEL org.opencontainers.image.description="FreshRSS"
 LABEL org.opencontainers.image.licenses=MIT
 RUN apk add --update --no-cache --virtual .build-dependencies $PHPIZE_DEPS \ 
@@ -67,7 +67,7 @@ RUN apk add --update --no-cache --virtual .build-dependencies $PHPIZE_DEPS \
     && apk del .build-dependencies 
 
 FROM --platform=$TARGET_PLATFORM $CONTAINER_BUILD_BASEIMAGE
-LABEL org.opencontainers.image.source=https://github.com/MyStarInYourSky/freshrss-kubernetes
+LABEL org.opencontainers.image.source=https://github.com/MyStarInYourSky/freshrss-deploy
 LABEL org.opencontainers.image.description="FreshRSS"
 LABEL org.opencontainers.image.licenses=MIT
 ARG PHP_API_VERSION
