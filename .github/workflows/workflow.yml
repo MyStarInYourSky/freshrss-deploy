@@ -257,8 +257,8 @@ jobs:
     - name: Run Index
       run: |
         cd build
-        export REPO_BOOTSTRAPPED="False"
-        aws s3api head-object --endpoint-url ${AWS_ENDPOINT_URL_S3} --bucket mystarinyoursky-helm-freshrss --key index.yaml > /dev/null 2>&1 || export REPO_BOOTSTRAPPED="True"
+        export REPO_BOOTSTRAPPED="True"
+        aws s3api head-object --endpoint-url ${AWS_ENDPOINT_URL_S3} --bucket mystarinyoursky-helm-freshrss --key index.yaml > /dev/null 2>&1 || export REPO_BOOTSTRAPPED="False"
         if [ $REPO_BOOTSTRAPPED == "True" ]; then
           rclone copyto mys3:mystarinyoursky-helm-freshrss/index.yaml index.yaml
           helm repo index . --url https://freshrss.helm.mystarinyoursky.net --merge index.yaml
