@@ -265,8 +265,8 @@ jobs:
         elif [ $REPO_BOOTSTRAPPED == "False" ]; then
           helm repo index . --url https://freshrss.helm.mystarinyoursky.net
         fi
-        rclone copyto index.yaml mys3:mystarinyoursky-helm-freshrss
-        rclone copyto freshrss-${CONTAINER_VERSION}.tgz mys3:mystarinyoursky-helm-freshrss
+        rclone copyto index.yaml mys3:mystarinyoursky-helm-freshrss/index.yaml
+        rclone copyto freshrss-${CONTAINER_VERSION}.tgz mys3:mystarinyoursky-helm-freshrss/freshrss-${CONTAINER_VERSION}.tgz
   container-mergeimage:
     name: Container Image Architecture Merge
     runs-on: ubuntu-24.04
