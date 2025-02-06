@@ -16,7 +16,7 @@ spec:
             {{- toYaml .Values.freshrss.securityContext | nindent 13 }}
           image: "{{ .Values.freshrss.image.repository }}:{{ .Values.freshrss.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.freshrss.image.pullPolicy }}
-          command: ['/bin/sh', '-e', '/usr/local/bin/freshrss-admin-user-creation.sh']
+          command: ['/bin/sh', '-e', '/usr/local/bin/freshrss-installscript.sh']
           env:
           {{- if eq .Values.freshrss.setting.database.type "postgres" }}
             - name: POSTGRES_HOST
@@ -88,9 +88,9 @@ spec:
               mountPath: /app/data
             - name: {{ include "freshrss.name-app" . }}-extensions
               mountPath: /app/extensions
-            - name: {{ include "freshrss.name-app" . }}-usercreation
-              mountPath: /usr/local/bin/freshrss-admin-user-creation.sh
-              subPath: freshrss-admin-user-creation.sh
+            - name: {{ include "freshrss.name-app" . }}-installscript
+              mountPath: /usr/local/bin/freshrss-installscript.sh
+              subPath: freshrss-installscript.sh
               readOnly: true
             - name: {{ include "freshrss.name-app" . }}-timezone
               mountPath: /usr/local/etc/php/conf.d/timezone.ini
@@ -105,13 +105,13 @@ spec:
       - name: {{ include "freshrss.name-app" . }}-extensions
         persistentVolumeClaim:
           claimName: {{ include "freshrss.name-app" . }}-extensions
-      - name: {{ include "freshrss.name-app" . }}-usercreation
+      - name: {{ include "freshrss.name-app" . }}-installscript
         configMap:
-          name: {{ include "freshrss.name-app" . }}-usercreation
+          name: {{ include "freshrss.name-app" . }}-installscript
           defaultMode: 0755
           items:
-            - key: freshrss-admin-user-creation.sh
-              path: freshrss-admin-user-creation.sh
+            - key: freshrss-installscript.sh
+              path: freshrss-installscript.sh
       - name: {{ include "freshrss.name-app" . }}-timezone
         configMap:
           name: {{ include "freshrss.name-app" . }}-timezone
