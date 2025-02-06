@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "freshrss.name-app" . }}-usercreation
+  name: {{ include "freshrss.name-app" . }}-install
   labels:
     {{- include "freshrss.labels-app" . | nindent 4 }}
 data:
@@ -12,22 +12,22 @@ data:
       ./cli/prepare.php
       {{- if eq .Values.freshrss.setting.database.type "sqlite" }}
       ./cli/do-install.php \
-        --default_user "$FRESHRSS_USERNAME" \
-        --auth_type form \
+        --default-user "$FRESHRSS_USERNAME" \
+        --auth-type form \
         --environment production \
         --language {{ .Values.freshrss.setting.language }} \
         --title {{ .Values.freshrss.setting.title }} \
-        --base_url {{ .Values.freshrss.setting.base_url }} \
+        --base-url {{ .Values.freshrss.setting.base_url }} \
         --db-type sqlite \
         --disable_update{{ if .Values.freshrss.setting.allow_robots }} --allow_robots{{ end }}{{ if .Values.freshrss.setting.allow_anonymous }} --allow_anonymous{{ end }}{{- if .Values.freshrss.setting.allow_anonymous_refresh }} --allow_anonymous_refresh{{ end }}{{ if .Values.freshrss.setting.api_enabled }} --api_enabled{{ end }}
       {{ else if eq .Values.freshrss.setting.database.type "postgres" }}
       ./cli/do-install.php \
-        --default_user "$FRESHRSS_USERNAME" \
-        --auth_type form \
+        --default-user "$FRESHRSS_USERNAME" \
+        --auth-type form \
         --environment production \
         --language {{ .Values.freshrss.setting.language }} \
         --title {{ .Values.freshrss.setting.title }} \
-        --base_url {{ .Values.freshrss.setting.base_url }} \
+        --base-url {{ .Values.freshrss.setting.base_url }} \
         --db-type pgsql \
         --db-host $POSTGRES_HOST \
         --db-user $POSTGRES_USER \
@@ -37,12 +37,12 @@ data:
         --disable_update{{ if .Values.freshrss.setting.allow_robots }} --allow_robots{{ end }}{{ if .Values.freshrss.setting.allow_anonymous }} --allow_anonymous{{ end }}{{- if .Values.freshrss.setting.allow_anonymous_refresh }} --allow_anonymous_refresh{{ end }}{{ if .Values.freshrss.setting.api_enabled }} --api_enabled{{ end }}
       {{ else if eq .Values.freshrss.setting.database.type "mysql" }}
       ./cli/do-install.php \
-        --default_user "$FRESHRSS_USERNAME" \
-        --auth_type form \
+        --default-user "$FRESHRSS_USERNAME" \
+        --auth-type form \
         --environment production \
         --language {{ .Values.freshrss.setting.language }} \
         --title {{ .Values.freshrss.setting.title }} \
-        --base_url {{ .Values.freshrss.setting.base_url }} \
+        --base-url {{ .Values.freshrss.setting.base_url }} \
         --db-type mysql \
         --db-host $MYSQL_HOST \
         --db-user $MYSQL_USER \
