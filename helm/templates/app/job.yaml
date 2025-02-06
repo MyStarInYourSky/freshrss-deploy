@@ -88,7 +88,7 @@ spec:
               mountPath: /app/data
             - name: {{ include "freshrss.name-app" . }}-extensions
               mountPath: /app/extensions
-            - name: {{ include "freshrss.name-app" . }}-install
+            - name: {{ include "freshrss.name-app" . }}-installscript
               mountPath: /usr/local/bin/freshrss-installscript.sh
               subPath: freshrss-installscript.sh
               readOnly: true
