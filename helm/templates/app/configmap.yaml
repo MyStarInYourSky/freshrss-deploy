@@ -2,11 +2,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "freshrss.name-app" . }}-install
+  name: {{ include "freshrss.name-app" . }}-installscript
   labels:
     {{- include "freshrss.labels-app" . | nindent 4 }}
 data:
-  freshrss-admin-user-creation.sh: |
+  freshrss-installscript.sh: |
     cd /app
     if [ ! -f "/app/data/config.php" ]; then
       ./cli/prepare.php
